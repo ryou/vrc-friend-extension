@@ -1,0 +1,22 @@
+// font
+$mainFontSize: 16px;
+$mainLineHeight: 1.6;
+$mainFontFamily: 'Roboto', 'Noto Sans JP', sans-serif;
+
+// animation
+$mainAnimationDuration: 0.25s;
+
+// z-index
+$zIndexFAB: 50;
+$zIndexSideMenuPc: 100;
+$zIndexGlobalNav: 150;
+$zIndexSideMenuSp: 170;
+$zIndexInstanceModal: 180;
+$zIndexDialog: 200;
+$zIndexFullLoader: 300;
+
+// size
+$navHeight: 50px;
+
+// hover effect
+$hoverFilter: brightness(115%);
