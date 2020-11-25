@@ -3,7 +3,8 @@ import Vue from 'vue'
 import InstanceListItem from '@/presentations/views/Home/localComponents/InstanceListItem/index.vue'
 import { Friend, Instance } from '@/types'
 import WatchInstanceDialog from '@/presentations/views/Home/localComponents/InstanceList/localComponents/WatchInstanceDialog/index.vue'
-import { friendsStore } from '@/domains/DomainStoreFactory'
+
+type Order = 'default' | 'friends_desc' | 'friends_asc'
 
 @Component({
   components: {
@@ -12,12 +13,31 @@ import { friendsStore } from '@/domains/DomainStoreFactory'
   },
 })
 export default class InstanceList extends Vue {
-  isVisibleToTop = false
+  isInitialized = false
 
   showOnlyFavoriteFriends = false
 
+  order: Order = 'default'
+
   @Prop()
   private instances!: Instance[]
+
+  get orderSelectItems(): { label: string; value: Order }[] {
+    return [
+      {
+        label: 'なし',
+        value: 'default',
+      },
+      {
+        label: 'フレンドが多い順',
+        value: 'friends_desc',
+      },
+      {
+        label: 'フレンドが少ない順',
+        value: 'friends_asc',
+      },
+    ]
+  }
 
   get items(): { id: string; instance: Instance; friends: Friend[] }[] {
     return this.instances
@@ -25,13 +45,32 @@ export default class InstanceList extends Vue {
         return {
           id: instance.location,
           instance,
-          friends: friendsStore.friendsByLocation(instance.location),
+          friends: this.$store.friendsStore.friendsByLocation.value(
+            instance.location
+          ),
         }
       })
       .filter(instance => {
         if (!this.showOnlyFavoriteFriends) return true
 
-        return instance.friends.find(friend => friend.isFavorited) !== undefined
+        return (
+          instance.friends.find(friend => friend.favorite !== undefined) !==
+          undefined
+        )
+      })
+      .sort((a, b) => {
+        const isPrivate =
+          a.instance.permission === 'private' ||
+          b.instance.permission === 'private'
+        if (this.order === 'default' || isPrivate) {
+          return 0
+        }
+
+        if (this.order === 'friends_desc') {
+          return b.friends.length - a.friends.length
+        }
+
+        return a.friends.length - b.friends.length
       })
   }
 
@@ -40,27 +79,7 @@ export default class InstanceList extends Vue {
     return scroller.$el as HTMLElement
   }
 
-  toTop() {
-    this.scrollerElement.scrollTo({
-      top: 0,
-    })
-  }
-
-  updateToTop() {
-    const scrollTop = this.scrollerElement.scrollTop
-
-    if (scrollTop > 100) {
-      this.isVisibleToTop = true
-    } else {
-      this.isVisibleToTop = false
-    }
-  }
-
   mounted() {
-    this.scrollerElement.addEventListener('scroll', this.updateToTop)
-  }
-
-  beforeDestroy() {
-    this.scrollerElement.removeEventListener('scroll', this.updateToTop)
+    this.isInitialized = true
   }
 }

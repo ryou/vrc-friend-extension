@@ -4,6 +4,10 @@ export type UnixTime = number
 
 export type InstanceLocation = string
 
+export type FavoriteType = 'world' | 'friend' | 'avatar'
+
+export type FavoriteTag = 'group_0' | 'group_1' | 'group_2'
+
 export type Friend = {
   id: string
   username: string
@@ -11,7 +15,7 @@ export type Friend = {
   currentAvatarImageUrl: string
   currentAvatarThumbnailImageUrl: string
   location: InstanceLocation
-  isFavorited: boolean
+  favorite?: Favorite
   isNew: boolean
 }
 
@@ -29,6 +33,8 @@ export const InstancePermission = {
   Public: 'public',
   Friends: 'friends',
   FriendPlus: 'friend+',
+  Invite: 'invite',
+  InvitePlus: 'invite+',
   Unknown: 'unknown',
 } as const
 export type InstancePermission = typeof InstancePermission[keyof typeof InstancePermission]
@@ -60,4 +66,11 @@ export type Instance = {
   ownerId?: string
   userNum?: number
   onFindVacancy?: () => void
+}
+
+export type Favorite = {
+  id: string
+  favoriteId: string
+  tags: FavoriteTag[]
+  type: FavoriteType
 }

@@ -28,3 +28,18 @@
   box-sizing: border-box;
   border-bottom: 1px solid rgb(var(--weakBackColor));
 }
+
+.lastSpacer {
+  height: 50px;
+}
+
+.toTop {
+  position: fixed;
+  top: $navHeight + 55px;
+  left: 125px;
+  transform: translateX(-50%);
+
+  @include mqSp {
+    top: 10px;
+  }
+}

@@ -2,7 +2,8 @@ const path = require('path')
 const { getRandomInteger } = require('./util')
 const worlds = require('./data/worlds')
 const friends = require('./data/friends')
-const { dummyErrorResponse } = require('./ErrorResponse')
+const favorites = require('./data/favorites')
+const { dummyErrorResponseList } = require('./dummyErrorResponseList')
 
 const locations = (() => {
   return [
@@ -10,6 +11,10 @@ const locations = (() => {
     'private',
     ...worlds.map(world => `${world.id}:123~hidden(usr_0)~nonce(hogehoge)`),
     ...worlds.map(world => `${world.id}:123~friends(usr_0)~nonce(hogehoge)`),
+    ...worlds.map(
+      world => `${world.id}:123~private(usr_678)~canRequestInvite~nonce(90)`
+    ),
+    ...worlds.map(world => `${world.id}:123~private(usr_678)~nonce(90)`),
     ...worlds.map(world => `${world.id}:123`),
   ]
 })()
@@ -34,15 +39,25 @@ module.exports = {
     res.json(onlineFriends.slice(offset, offset + n))
   },
   listFavorites(req, res) {
-    const favoriteFriends = friends.slice(0, 5)
+    res.json(favorites)
+  },
+  addFavorite(req, res) {
+    const timeString = String(new Date().getTime())
+    const newFavorite = {
+      id: `fvrt_${timeString}`,
+      favoriteId: req.body.favoriteId,
+      type: req.body.type,
+      tags: req.body.tags,
+    }
+    favorites.push(newFavorite)
 
-    res.json(
-      favoriteFriends.map(friend => {
-        return {
-          favoriteId: friend.id,
-        }
-      })
-    )
+    res.json(newFavorite)
+  },
+  deleteFavorite(req, res) {
+    const index = favorites.findIndex(favorite => favorite.id === req.body.id)
+    favorites.splice(index, 1)
+
+    res.json()
   },
   getWorld(req, res) {
     const id = req.params.id
@@ -115,15 +130,15 @@ module.exports = {
     res.sendFile(path.resolve(__dirname, './data/dummy.png'))
   },
   mockError(req, res) {
-    dummyErrorResponse.addItem({
+    dummyErrorResponseList.addItem({
       controllerName: req.body.controllerName,
       status: req.body.status,
     })
 
-    res.json(dummyErrorResponse.items)
+    res.json(dummyErrorResponseList.items)
   },
   unmockError(req, res) {
-    dummyErrorResponse.clear()
-    res.json(dummyErrorResponse.items)
+    dummyErrorResponseList.clear()
+    res.json(dummyErrorResponseList.items)
   },
 }

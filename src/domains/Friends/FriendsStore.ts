@@ -1,35 +1,49 @@
-import Vue from 'vue'
+import { computed, reactive } from '@vue/composition-api'
+import { UserApiResponse } from '@/types/ApiResponse'
 import { Friend, InstanceLocation } from '@/types'
-import {
-  convertApiResponseForPresentation,
-  markNewFriends,
-} from '@/domains/Friends/FriendsService'
+import { ICanGetFavoriteByUserId } from '@/domains/Favorites/FavoritesStore'
+import { IFriendsRepository } from '@/infras/Friends/IFriendsRepository'
+import { markNewFriends } from '@/domains/Friends/FriendsService'
 import {
   LogBeforeAfter,
   MakeReferenceToWindowObjectInDevelopment,
 } from '@/libs/Decorators'
-import { IFriendsRepository } from '@/infras/Friends/IFriendsRepository'
+
+// TODO: 命名に関して再考。流石にFriendWithNewはやばそう
+export type FriendWithNew = UserApiResponse & { isNew: boolean }
 
 type State = {
-  friends: Friend[]
+  friends: FriendWithNew[]
 }
 @MakeReferenceToWindowObjectInDevelopment('friendsStore')
 export class FriendsStore {
-  private _state = Vue.observable<State>({
+  constructor(
+    private readonly _friendsRepository: IFriendsRepository,
+    private readonly _favoritesStore: ICanGetFavoriteByUserId
+  ) {}
+
+  private readonly _state = reactive<State>({
     friends: [],
   })
 
-  constructor(private readonly _friendsRepository: IFriendsRepository) {}
+  readonly friends = computed<Friend[]>(() => {
+    return this._state.friends.map(friend => {
+      const favorite = this._favoritesStore.favoriteByUserId.value(friend.id)
 
-  get friends() {
-    return this._state.friends
-  }
+      return {
+        ...friend,
+        favorite,
+      }
+    })
+  })
 
-  get friendsByLocation() {
+  readonly friendsByLocation = computed<
+    (location: InstanceLocation) => Friend[]
+  >(() => {
     return (location: InstanceLocation) => {
-      return this.friends.filter(friend => friend.location === location)
+      return this.friends.value.filter(friend => friend.location === location)
     }
-  }
+  })
 
   @LogBeforeAfter('_state')
   private setFriendsMutation(friends: Friend[]) {
@@ -37,15 +51,8 @@ export class FriendsStore {
   }
 
   async fetchFriendsAction() {
-    const [friends, favorites] = await Promise.all([
-      this._friendsRepository.fetchAllFriends(),
-      this._friendsRepository.fetchFavoritesAboutFriends(),
-    ])
+    const newFriends = await this._friendsRepository.fetchAllFriends()
 
-    const presentationFriends = convertApiResponseForPresentation(
-      friends,
-      favorites
-    )
-    this.setFriendsMutation(markNewFriends(this.friends, presentationFriends))
+    this.setFriendsMutation(markNewFriends(this._state.friends, newFriends))
   }
 }

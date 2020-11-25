@@ -1,7 +1,12 @@
-import { FavoriteApiResponse, UserApiResponse } from '@/types/ApiResponse'
-import { Friend } from '@/types'
-import { FriendsStore } from '@/domains/Friends/FriendsStore'
+import { UserApiResponse } from '@/types/ApiResponse'
+import { Favorite, Friend } from '@/types'
 import { IFriendsRepository } from '@/infras/Friends/IFriendsRepository'
+import VueCompositionApi, { computed, reactive } from '@vue/composition-api'
+import { createLocalVue } from '@vue/test-utils'
+import { FriendsStore } from '@/domains/Friends/FriendsStore'
+
+const localVue = createLocalVue()
+localVue.use(VueCompositionApi)
 
 const generateDummyFriends = (count: number) => {
   const dummyFriends: UserApiResponse[] = []
@@ -21,57 +26,91 @@ const generateDummyFriends = (count: number) => {
 }
 
 class MockFriendsRepository implements IFriendsRepository {
-  constructor(
-    public friends: UserApiResponse[],
-    public favorites: FavoriteApiResponse[]
-  ) {}
+  constructor(public friends: UserApiResponse[]) {}
 
   async fetchAllFriends(): Promise<UserApiResponse[]> {
     return this.friends
   }
+}
 
-  async fetchFavoritesAboutFriends(): Promise<FavoriteApiResponse[]> {
-    return this.favorites
+const createMockFavoritesStore = (initialFavorites: Favorite[]) => {
+  const state = reactive<{ favorites: Favorite[] }>({
+    favorites: [],
+  })
+
+  const favoriteByUserId = computed(() => {
+    return (userId: string) => {
+      return state.favorites.find(favorite => favorite.favoriteId === userId)
+    }
+  })
+
+  state.favorites = initialFavorites
+
+  return {
+    favoriteByUserId,
   }
 }
 
 describe('fetchFriends', () => {
   it('APIから取得したフレンドデータを取得できる', async () => {
     const dummyData: UserApiResponse[] = generateDummyFriends(310)
-    const mockFriendsRepository = new MockFriendsRepository(dummyData, [])
-    const friendsStore = new FriendsStore(mockFriendsRepository)
+    const mockFriendsRepository = new MockFriendsRepository(dummyData)
+    const mockFavoriteStore = createMockFavoritesStore([])
+    const friendsStore = new FriendsStore(
+      mockFriendsRepository,
+      mockFavoriteStore
+    )
 
     await friendsStore.fetchFriendsAction()
 
-    expect(friendsStore.friends).toEqual(
+    expect(friendsStore.friends.value).toEqual(
       dummyData.map(item => ({
         ...item,
         isNew: false,
-        isFavorited: false,
       }))
     )
   })
 
   it('Favorite登録されているユーザーはisFavoritedがtrueになる', async () => {
     const dummyData: UserApiResponse[] = generateDummyFriends(310)
-    const mockFriendsRepository = new MockFriendsRepository(dummyData, [
-      {
-        favoriteId: '10',
-      },
-      {
-        favoriteId: '123',
-      },
+    const mockFriendsRepository = new MockFriendsRepository(dummyData)
+    const favoriteId10: Favorite = {
+      id: 'dummy',
+      favoriteId: '10',
+      tags: [],
+      type: 'friend',
+    }
+    const favoriteId123: Favorite = {
+      id: 'dummy',
+      favoriteId: '123',
+      tags: [],
+      type: 'friend',
+    }
+
+    const mockFavoriteStore = createMockFavoritesStore([
+      favoriteId10,
+      favoriteId123,
     ])
-    const friendsStore = new FriendsStore(mockFriendsRepository)
+    const friendsStore = new FriendsStore(
+      mockFriendsRepository,
+      mockFavoriteStore
+    )
 
     await friendsStore.fetchFriendsAction()
 
-    expect(friendsStore.friends).toEqual(
+    expect(friendsStore.friends.value).toEqual(
       dummyData.map<Friend>(item => {
+        const favorite = (() => {
+          if (item.id === '10') return favoriteId10
+          if (item.id === '123') return favoriteId123
+
+          return undefined
+        })()
+
         return {
           ...item,
           isNew: false,
-          isFavorited: item.id === '10' || item.id === '123',
+          favorite,
         }
       })
     )
@@ -80,10 +119,13 @@ describe('fetchFriends', () => {
   it('複数回呼ばれた場合、いなくなったユーザーのデータは消え、新しくログインしたユーザーはisNewがtrueになる', async () => {
     const dummyData: UserApiResponse[] = generateDummyFriends(310)
     const mockFriendsRepository = new MockFriendsRepository(
-      dummyData.slice(0, 200),
-      []
+      dummyData.slice(0, 200)
     )
-    const friendsStore = new FriendsStore(mockFriendsRepository)
+    const mockFavoriteStore = createMockFavoritesStore([])
+    const friendsStore = new FriendsStore(
+      mockFriendsRepository,
+      mockFavoriteStore
+    )
 
     await friendsStore.fetchFriendsAction()
 
@@ -91,12 +133,11 @@ describe('fetchFriends', () => {
 
     await friendsStore.fetchFriendsAction()
 
-    expect(friendsStore.friends).toEqual(
+    expect(friendsStore.friends.value).toEqual(
       dummyData.slice(100, 400).map<Friend>(item => {
         return {
           ...item,
           isNew: Number(item.id) >= 200,
-          isFavorited: false,
         }
       })
     )

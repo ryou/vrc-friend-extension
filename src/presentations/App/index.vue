@@ -16,6 +16,9 @@
         <router-view />
       </div>
     </template>
+    <Toasts />
+    <FullLoader />
+    <Alert />
   </div>
 </template>
 
